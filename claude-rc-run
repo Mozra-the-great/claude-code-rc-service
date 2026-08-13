@@ -1,0 +1,50 @@
+#!/bin/sh
+# Start Claude Code Remote Control as a long-running service.
+#
+# Kept separate from the systemd unit so the PTY shim below can be toggled
+# without editing and reloading the unit.
+#
+# Configuration comes from the environment, normally via /etc/default/claude-rc.
+
+set -eu
+
+: "${CLAUDE_BIN:=claude}"
+: "${CLAUDE_RC_WORKDIR:=$HOME/work}"
+: "${CLAUDE_RC_NAME:=}"
+: "${CLAUDE_RC_FLAGS:=}"
+: "${CLAUDE_RC_PTY:=off}"
+
+if [ ! -d "$CLAUDE_RC_WORKDIR" ]; then
+  echo "claude-rc: work directory does not exist: $CLAUDE_RC_WORKDIR" >&2
+  exit 1
+fi
+cd "$CLAUDE_RC_WORKDIR"
+
+# `claude rc` refuses to start without a logged-in subscription account. Fail
+# with a useful message instead of letting systemd restart-loop on it.
+if [ ! -r "$HOME/.claude/.credentials.json" ]; then
+  echo "claude-rc: not logged in - run '$CLAUDE_BIN' interactively as this user first" >&2
+  exit 78 # EX_CONFIG
+fi
+
+set -- rc
+
+if [ -n "$CLAUDE_RC_NAME" ]; then
+  set -- "$@" --name "$CLAUDE_RC_NAME"
+fi
+
+if [ -n "$CLAUDE_RC_FLAGS" ]; then
+  # Intentionally word-split: CLAUDE_RC_FLAGS holds several flags.
+  # shellcheck disable=SC2086
+  set -- "$@" $CLAUDE_RC_FLAGS
+fi
+
+if [ "$CLAUDE_RC_PTY" = "on" ]; then
+  # `script` allocates a pseudo-terminal. Needed if Claude Code skips work that
+  # only happens for a rendered TUI - most notably the statusline command, which
+  # is the sole source of rate-limit data for claude-code-ratelimit-hook.
+  # -e propagates the child's exit status so systemd still sees failures.
+  exec script -qe -c "$(printf '%s ' "$CLAUDE_BIN" "$@")" /dev/null
+fi
+
+exec "$CLAUDE_BIN" "$@"

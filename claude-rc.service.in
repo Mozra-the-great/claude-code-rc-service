@@ -1,0 +1,40 @@
+[Unit]
+Description=Claude Code Remote Control
+After=network-online.target
+Wants=network-online.target
+
+# Five failed starts within five minutes and systemd gives up, instead of
+# hammering the API in a crash loop. Recover with `systemctl reset-failed`.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@WORKDIR@
+
+Environment=HOME=@HOME@
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=TERM=xterm-256color
+EnvironmentFile=-/etc/default/claude-rc
+
+ExecStart=/usr/local/bin/claude-rc-run
+
+Restart=always
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=claude-rc
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=@HOME@
+ProtectControlGroups=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
