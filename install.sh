@@ -21,7 +21,11 @@ done
 
 [ "$(id -u)" -eq 0 ] || { echo "install.sh: must run as root" >&2; exit 1; }
 
-src_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# CDPATH must be empty, otherwise `cd` may print and jump somewhere else.
+# Assigned on its own line rather than as a `CDPATH= cd ...` prefix, which
+# shellcheck flags as SC1007.
+CDPATH=''
+src_dir=$(cd -- "$(dirname -- "$0")" && pwd)
 
 for dep in systemctl install useradd; do
   command -v "$dep" >/dev/null 2>&1 || { echo "install.sh: missing dependency: $dep" >&2; exit 1; }
