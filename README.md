@@ -137,4 +137,4 @@ journalctl -u claude-rc -f
 
 ## License
 
-Apache-2.0
+GNU General Public License v3.0 — see [`LICENSE`](LICENSE).
