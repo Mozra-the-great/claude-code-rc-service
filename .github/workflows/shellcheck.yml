@@ -18,7 +18,13 @@ jobs:
       - name: Lint shell scripts
         run: shellcheck --shell=sh install.sh uninstall.sh claude-rc-run
       - name: Validate the systemd unit template
+        # systemd-analyze also resolves User= and ExecStart=, so the service
+        # user and the wrapper have to exist for the check to say anything
+        # beyond "syntax parses".
         run: |
+          sudo useradd --create-home --shell /bin/bash svcuser
+          sudo install -d -o svcuser -g svcuser /home/svcuser/work
+          sudo install -m 0755 claude-rc-run /usr/local/bin/claude-rc-run
           sed -e 's|@USER@|svcuser|g' -e 's|@HOME@|/home/svcuser|g' \
               -e 's|@WORKDIR@|/home/svcuser/work|g' \
               claude-rc.service.in > /tmp/claude-rc.service
