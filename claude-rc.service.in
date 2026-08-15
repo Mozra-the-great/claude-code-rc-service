@@ -27,6 +27,13 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=claude-rc
 
+# `claude rc` keeps redrawing its TUI, which is roughly 200 lines a minute of
+# pure noise once the startup banner is out. Rate-limiting per unit keeps the
+# banner (and any error burst) while stopping the steady stream from burying
+# everything else in the journal. Raise the burst if you lose lines you need.
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=100
+
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full

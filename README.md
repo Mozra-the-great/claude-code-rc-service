@@ -51,9 +51,20 @@ authenticated non-interactively. Finish as the service user:
 sudo -u claude -i
 cd ~/work
 claude          # log in, and accept the workspace trust prompt
+claude rc       # answer the one-time "Enable Remote Control? (y/n)" with y, then Ctrl+C
 exit
 sudo systemctl start claude-rc
 ```
+
+That third line matters. On its very first run `claude rc` asks **"Enable Remote
+Control? (y/n)"**. With no terminal attached it reads EOF and exits *successfully*, so
+the service restarts five times and lands in `failed` with no error message anywhere —
+only that question in the journal. Answering it once persists the choice.
+
+If you automate the host and cannot run it by hand, the answer is stored in
+`~/.claude.json`; setting `remoteDialogSeen` and `hasUsedRemoteControl` to `true` there
+before first start has the same effect. That is undocumented internal state, so prefer
+the interactive route where you can.
 
 Uninstall with `sudo ./uninstall.sh`. It removes the unit and the wrapper but leaves the
 service user, its home and your config alone — those hold credentials and work in progress.
@@ -93,17 +104,26 @@ is missing, so a not-logged-in host fails visibly instead of silently looping.
 If you also use
 [claude-code-ratelimit-hook](https://github.com/Mozra-the-great/claude-code-ratelimit-hook),
 be aware that it gets its data from the statusline command — that is the only place Claude
-Code exposes rate-limit fields. Whether the statusline runs in the headless service context
-is worth verifying rather than assuming:
+Code exposes rate-limit fields.
+
+Measured on Debian 12: the statusline **does** run under this service with
+`CLAUDE_RC_PTY=off`, no pseudo-terminal needed. `rate-limit-state.json` is written with
+real percentages as soon as the server comes up.
+
+It refreshes when a session renders, not on a timer — so during idle periods `updated_at`
+stands still, and during actual work it tracks. That is fine for the hook, which only
+needs current data at the moment it decides whether to block, and which treats a window
+whose `resets_at` has passed as no longer blocking.
+
+Check it with:
 
 ```sh
 sudo -u claude cat ~claude/.claude/rate-limit-state.json
 ```
 
-If `updated_at` does not move after a session, set `CLAUDE_RC_PTY=on` and restart. That
-runs the server under `script`, which allocates a pseudo-terminal, and is enough for
-anything gated on a rendered TUI. The hook repo documents a journal-based fallback if even
-that does not help.
+If the file never appears at all, first make sure `settings.json` actually declares a
+`statusLine` command — an empty or default `settings.json` has none, and then there is
+nothing to fire. Only after that is ruled out is `CLAUDE_RC_PTY=on` worth trying.
 
 ## Security notes
 
@@ -126,9 +146,13 @@ The unit applies `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=full`,
 | Symptom | Cause |
 |---|---|
 | Exits `78` immediately | Not logged in — run `claude` interactively as the service user |
+| `failed`, journal ends on "Enable Remote Control? (y/n)" | The one-time prompt was never answered — see Install |
 | Starts, but no session in the app | Workspace trust prompt not accepted yet |
 | `failed` after ~1 min | Start limit tripped; `journalctl -u claude-rc`, then `reset-failed` |
 | `rate-limit-state.json` never updates | Try `CLAUDE_RC_PTY=on` |
+
+Note that a clean exit code 0 is *not* proof things went well: the unanswered
+first-run prompt exits successfully, which is exactly what makes it hard to spot.
 
 ```sh
 systemctl status claude-rc
