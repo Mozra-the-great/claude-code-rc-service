@@ -6,7 +6,7 @@ without leaving a terminal open.
 
 `claude rc` is a persistent server: it accepts multiple concurrent sessions and keeps
 running when a session ends. This repo wraps it in a unit that starts at boot, restarts
-on crash, and refuses to restart-loop.
+on crash, and keeps retrying through outages without hammering the API.
 
 ## Why a service
 
@@ -85,13 +85,15 @@ service user, its home and your config alone — those hold credentials and work
 
 ## Restart behaviour
 
-`Restart=always` with `RestartSec=10`, capped by `StartLimitBurst=5` in
-`StartLimitIntervalSec=300`. Five failed starts inside five minutes and systemd stops
-trying, rather than hammering the API in a crash loop. Clear that state with:
+`Restart=always` with `RestartSec=60` and `StartLimitIntervalSec=0`, so systemd never gives
+up. After a network or API outage every start fails with a connect timeout; a start limit
+would leave the unit in `failed` for good once the outage outlasts the burst, and nothing
+would bring it back. The fixed 60 s pause keeps a persistent failure from turning into a
+crash loop against the API. (Debian 12 ships systemd 252, which has no `RestartSteps`
+for a growing back-off.)
 
-```sh
-sudo systemctl reset-failed claude-rc
-```
+A unit that keeps failing therefore shows up as `activating (auto-restart)` rather than
+`failed`; watch `NRestarts` and the journal, not just the unit state.
 
 Hitting a usage limit does **not** restart the service — the server stays up and only the
 session inside it waits.
@@ -146,9 +148,9 @@ The unit applies `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=full`,
 | Symptom | Cause |
 |---|---|
 | Exits `78` immediately | Not logged in — run `claude` interactively as the service user |
-| `failed`, journal ends on "Enable Remote Control? (y/n)" | The one-time prompt was never answered — see Install |
+| Restarts every minute, journal ends on "Enable Remote Control? (y/n)" | The one-time prompt was never answered — see Install |
 | Starts, but no session in the app | Workspace trust prompt not accepted yet |
-| `failed` after ~1 min | Start limit tripped; `journalctl -u claude-rc`, then `reset-failed` |
+| Stuck in `activating (auto-restart)` | Starts keep failing (outage, auth); `journalctl -u claude-rc` and `systemctl show claude-rc -p NRestarts` |
 | `rate-limit-state.json` never updates | Try `CLAUDE_RC_PTY=on` |
 
 Note that a clean exit code 0 is *not* proof things went well: the unanswered

@@ -3,10 +3,11 @@ Description=Claude Code Remote Control
 After=network-online.target
 Wants=network-online.target
 
-# Five failed starts within five minutes and systemd gives up, instead of
-# hammering the API in a crash loop. Recover with `systemctl reset-failed`.
-StartLimitIntervalSec=300
-StartLimitBurst=5
+# Never give up. A network or API outage makes every start fail with a connect
+# timeout, and with a start limit systemd would park the unit in `failed` for
+# good once the outage outlasts the burst. The fixed 60 s RestartSec below is
+# what keeps this from being a crash loop against the API.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -21,7 +22,7 @@ EnvironmentFile=-/etc/default/claude-rc
 ExecStart=/usr/local/bin/claude-rc-run
 
 Restart=always
-RestartSec=10
+RestartSec=60
 
 StandardOutput=journal
 StandardError=journal
