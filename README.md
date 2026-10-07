@@ -58,7 +58,7 @@ sudo systemctl start claude-rc
 
 That third line matters. On its very first run `claude rc` asks **"Enable Remote
 Control? (y/n)"**. With no terminal attached it reads EOF and exits *successfully*, so
-the service restarts five times and lands in `failed` with no error message anywhere —
+the service restarts every minute with no error message anywhere —
 only that question in the journal. Answering it once persists the choice.
 
 If you automate the host and cannot run it by hand, the answer is stored in
