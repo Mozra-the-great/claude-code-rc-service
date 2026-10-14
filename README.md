@@ -66,6 +66,10 @@ If you automate the host and cannot run it by hand, the answer is stored in
 before first start has the same effect. That is undocumented internal state, so prefer
 the interactive route where you can.
 
+`./install.sh --destdir DIR` stages the wrapper, the unit and the env file under `DIR`
+instead of the live system (packaging, tests): no root, no user creation, systemd untouched.
+The service user must already exist.
+
 Uninstall with `sudo ./uninstall.sh`. It removes the unit and the wrapper but leaves the
 service user, its home and your config alone — those hold credentials and work in progress.
 
@@ -160,6 +164,16 @@ first-run prompt exits successfully, which is exactly what makes it hard to spot
 systemctl status claude-rc
 journalctl -u claude-rc -f
 ```
+
+## Tests
+
+```sh
+sh tests/run-all.sh
+```
+
+Plain POSIX `sh`, no dependencies. The wrapper tests run `claude-rc-run` against a stub
+`claude` (and a stub `script`), the install tests use `--destdir` into a temp dir. Nothing
+calls the real `claude`, systemd or the network.
 
 ## License
 
