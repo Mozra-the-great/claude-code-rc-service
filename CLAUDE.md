@@ -22,6 +22,7 @@ shellcheck --shell=sh install.sh uninstall.sh claude-rc-run tests/*.sh
   stable names, no path filter.
 - `workflow-lint.yml`: actionlint + zizmor. `secret-scan.yml`: gitleaks on PRs.
 - No Claude workflows by design. Actions pinned by SHA; Dependabot keeps them fresh.
+- CodeQL runs as GitHub default setup (actions, default suite, not a workflow file); the `CodeQL` status check is required by the ruleset.
 
 ## Conventions
 - Conventional commits in English, feature branches, no direct pushes to `main`.
